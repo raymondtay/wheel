@@ -15,6 +15,29 @@ import io.circe._, parser._, syntax._
 /* cats */
 import cats._, data._, implicits._
 
+// Materializes the json codecs by discovering all known subtypes
+// and restriction we want to have is to make sure they are all 
+// case classes
+object Materalize {
+
+  def materializeCodec[T]: Any = macro impl[T]
+
+  def impl[T: c.WeakTypeTag](c: Context): c.Tree = {
+    import c.universe._
+    import definitions._
+    import Flag._
+
+    val sym = c.weakTypeOf[T].typeSymbol
+    if (!sym.asClass.isSealed || !sym.asClass.isTrait) c.abort(c.enclosingPosition, s"$sym needs to be a sealed trait.")
+    val fields = sym.typeSignature.declarations.toList.collect{ case x: TermSymbol if x.isVal && x.isCaseAccessor ⇒ x }
+
+    val jsonModels = sym.asClass.knownDirectSubclasses
+
+    q""
+  }
+
+}
+
 @compileTimeOnly("Enable macro paradise to use macro annotations.")
 class CrankIt(jsonStringToBeParsed: String,
              pathToJsonSchema: Option[String] = None) extends StaticAnnotation {
@@ -48,7 +71,7 @@ class Macros(val c: Context) {
           }
         """
       }
-      case _ => c.abort(c.enclosingPosition, "This annotation can only be used with objects.")
+      case _ ⇒ c.abort(c.enclosingPosition, "This annotation can only be used with objects.")
     } 
   }
 }
